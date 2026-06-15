@@ -305,7 +305,7 @@
         <div class="header">
             <h1>📊 Hyptop Log Analyzer</h1>
             <p>Upload and visualize your hyptop performance data</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 1.1.0</p>
+            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 1.3.1</p>
         </div>
         
         <div class="upload-section">
@@ -344,8 +344,35 @@
             </div>
         </div>
         
-        <div class="stats hidden" id="stats"></div>
+        <div class="stats hidden" id="thresholdStats">
+            <div class="stat-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <h3 style="color: white; font-size: 1.1em; margin-bottom: 15px;">⚡ Overall CPU% Threshold Analysis</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 15px;">
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 50%</div>
+                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold50">0.00%</div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold50time">0s</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 80%</div>
+                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold80">0.00%</div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold80time">0s</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 85%</div>
+                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold85">0.00%</div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold85time">0s</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 90%</div>
+                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold90">0.00%</div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold90time">0s</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
+
         <div class="charts hidden" id="charts">
             <div class="zoom-info">
                 <strong>💡 Tip:</strong> Drag across any of the three metric charts to select a time range. The statistics will update to show averages for your selection.
@@ -358,6 +385,7 @@
                         <canvas id="overallCpuChart"></canvas>
                     </div>
                 </div>
+                <div class="stats" id="stats" style="margin-bottom: 30px;"></div>
                 <div class="chart-container core-chart">
                     <h2>📊 Core % Over Time</h2>
                     <div class="chart-wrapper">
@@ -530,11 +558,81 @@
             document.getElementById('controls').classList.remove('hidden');
             document.getElementById('charts').classList.remove('hidden');
             document.getElementById('stats').classList.remove('hidden');
+            document.getElementById('thresholdStats').classList.remove('hidden');
             
             // Update visualizations
             displaySystemInfo();
             updateStats();
             updateCharts();
+        }
+        
+        // Calculate threshold statistics for Overall CPU%
+        function calculateThresholdStats(startIdx = 0, endIdx = null) {
+            const iflCount = parsedData.cpuInfo ? 
+                parseInt((parsedData.cpuInfo.match(/IFL\((\d+)\)/) || [])[1]) || 0 : 0;
+            
+            if (iflCount === 0) return null;
+            
+            const end = endIdx !== null ? endIdx : parsedData.timestamps.length;
+            const thresholds = [50, 80, 85, 90];
+            const counts = { 50: 0, 80: 0, 85: 0, 90: 0 };
+            let totalPoints = 0;
+            
+            // Calculate time interval between samples (in seconds)
+            let sampleInterval = 1; // default to 1 second
+            if (parsedData.timestamps.length >= 2) {
+                const time1 = parsedData.timestamps[0].split(':');
+                const time2 = parsedData.timestamps[1].split(':');
+                const seconds1 = parseInt(time1[0]) * 3600 + parseInt(time1[1]) * 60 + parseInt(time1[2]);
+                const seconds2 = parseInt(time2[0]) * 3600 + parseInt(time2[1]) * 60 + parseInt(time2[2]);
+                sampleInterval = Math.abs(seconds2 - seconds1);
+                if (sampleInterval === 0) sampleInterval = 1; // fallback
+            }
+            
+            for (let i = startIdx; i < end; i++) {
+                let totalCore = 0, totalMgm = 0;
+                Object.values(parsedData.systems).forEach(system => {
+                    if (i < system.core.length) {
+                        totalCore += system.core[i] || 0;
+                        totalMgm += system.mgm[i] || 0;
+                    }
+                });
+                const overallCpu = ((totalCore + totalMgm) / 100) / iflCount * 100;
+                
+                thresholds.forEach(threshold => {
+                    if (overallCpu > threshold) {
+                        counts[threshold]++;
+                    }
+                });
+                totalPoints++;
+            }
+            
+            const results = {};
+            thresholds.forEach(threshold => {
+                const percentage = totalPoints > 0 ? 
+                    ((counts[threshold] / totalPoints) * 100).toFixed(2) : '0.00';
+                const absoluteSeconds = counts[threshold] * sampleInterval;
+                const hours = Math.floor(absoluteSeconds / 3600);
+                const minutes = Math.floor((absoluteSeconds % 3600) / 60);
+                const seconds = absoluteSeconds % 60;
+                
+                let timeStr;
+                if (hours > 0) {
+                    timeStr = `${hours}h${minutes}m${seconds}s`;
+                } else if (minutes > 0) {
+                    timeStr = `${minutes}m${seconds}s`;
+                } else {
+                    timeStr = `${seconds}s`;
+                }
+                
+                results[threshold] = {
+                    percentage: percentage,
+                    absolute: timeStr,
+                    seconds: absoluteSeconds
+                };
+            });
+            
+            return results;
         }
         
         // Display system information
@@ -601,6 +699,19 @@
         function updateStats(startIdx = 0, endIdx = null) {
             const statsContainer = document.getElementById('stats');
             const selectedSystem = document.getElementById('systemSelect').value;
+            
+            // Update threshold statistics
+            const thresholdStats = calculateThresholdStats(startIdx, endIdx);
+            if (thresholdStats) {
+                document.getElementById('threshold50').textContent = thresholdStats[50].percentage + '%';
+                document.getElementById('threshold50time').textContent = thresholdStats[50].absolute;
+                document.getElementById('threshold80').textContent = thresholdStats[80].percentage + '%';
+                document.getElementById('threshold80time').textContent = thresholdStats[80].absolute;
+                document.getElementById('threshold85').textContent = thresholdStats[85].percentage + '%';
+                document.getElementById('threshold85time').textContent = thresholdStats[85].absolute;
+                document.getElementById('threshold90').textContent = thresholdStats[90].percentage + '%';
+                document.getElementById('threshold90time').textContent = thresholdStats[90].absolute;
+            }
             
             // Find peak partition
             let peakPartition = '';
@@ -1234,11 +1345,49 @@
                                     borderColor: 'rgba(102, 126, 234, 0.8)',
                                     borderWidth: 2
                                 },
-                                mode: 'x'
+                                mode: 'x',
+                                onZoomComplete: function({chart}) {
+                                    const xScale = chart.scales.x;
+                                    // Get the visible timestamp range
+                                    const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
+                                    const startTimestamp = visibleLabels[0];
+                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
+                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
+                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    
+                                    // Sync zoom to all metric charts
+                                    ['core', 'the', 'mgm'].forEach(m => {
+                                        if (charts[m]) {
+                                            charts[m].zoomScale('x', {min: xScale.min, max: xScale.max}, 'none');
+                                        }
+                                    });
+                                    
+                                    updateStats(startIdx, endIdx);
+                                    updateMaxSumAnnotation(startIdx, endIdx);
+                                }
                             },
                             pan: {
                                 enabled: true,
-                                mode: 'x'
+                                mode: 'x',
+                                onPanComplete: function({chart}) {
+                                    const xScale = chart.scales.x;
+                                    // Get the visible timestamp range
+                                    const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
+                                    const startTimestamp = visibleLabels[0];
+                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
+                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
+                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    
+                                    // Sync pan to all metric charts
+                                    ['core', 'the', 'mgm'].forEach(m => {
+                                        if (charts[m]) {
+                                            charts[m].pan({x: xScale.min}, undefined, 'none');
+                                        }
+                                    });
+                                    
+                                    updateStats(startIdx, endIdx);
+                                    updateMaxSumAnnotation(startIdx, endIdx);
+                                }
                             },
                             limits: {
                                 x: {min: 0, max: parsedData.timestamps.length - 1}
