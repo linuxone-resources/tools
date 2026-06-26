@@ -85,10 +85,68 @@
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
         
-        .file-name {
-            margin-top: 15px;
-            font-size: 1em;
+        .file-list {
+            margin-top: 20px;
+            text-align: left;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .file-item {
+            background: white;
+            padding: 12px 15px;
+            margin: 8px 0;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .file-item-name {
+            font-size: 0.95em;
             color: #495057;
+            flex: 1;
+        }
+        
+        .file-item-info {
+            font-size: 0.85em;
+            color: #6c757d;
+            margin-left: 15px;
+        }
+        
+        .file-item-remove {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+            margin-left: 10px;
+            transition: background 0.2s;
+        }
+        
+        .file-item-remove:hover {
+            background: #c82333;
+        }
+        
+        .clear-all-btn {
+            display: inline-block;
+            padding: 10px 25px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 0.95em;
+            margin-top: 15px;
+            transition: background 0.2s;
+        }
+        
+        .clear-all-btn:hover {
+            background: #c82333;
         }
         
         .controls {
@@ -305,7 +363,7 @@
         <div class="header">
             <h1>📊 Hyptop Log Analyzer</h1>
             <p>Upload and visualize your hyptop performance data</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 1.3.1</p>
+            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.2 - Multi-File Support, Time Range Selection & Percentiles</p>
         </div>
         
         <div class="upload-section">
@@ -313,14 +371,16 @@
                 <strong style="color: #667eea;">💡 Sample hyptop command:</strong>
                 <code style="display: block; background: #fff; padding: 10px; margin-top: 8px; border-radius: 4px; font-family: monospace; font-size: 0.9em; color: #333;">hyptop -b -d 1 -f "#,c,e,m,C,M,o" -n 1800 &gt; hyptop.out</code>
                 <small style="display: block; margin-top: 8px; color: #666;">Collect 30 minutes (1800s) of data with 1 second interval</small>
+                <small style="display: block; margin-top: 5px; color: #667eea; font-weight: 600;">✨ NEW: Upload multiple files to see continuous time-series view across different time periods!</small>
+                <small style="display: block; margin-top: 5px; color: #666; font-style: italic;">Tip: Files are displayed sequentially in upload order. Upload files in chronological order for best results.</small>
             </div>
             <div class="file-input-wrapper">
-                <input type="file" id="fileInput" accept=".log,.txt">
+                <input type="file" id="fileInput" accept=".log,.txt,.out" multiple>
                 <label for="fileInput" class="file-input-label">
-                    📁 Choose Hyptop Log File
+                    📁 Choose Hyptop Log Files (Multiple)
                 </label>
             </div>
-            <div class="file-name" id="fileName">No file selected</div>
+            <div class="file-list" id="fileList"></div>
         </div>
         
         <div class="error" id="errorMsg"></div>
@@ -342,6 +402,27 @@
                     <option value="stacked">Stacked Area</option>
                 </select>
             </div>
+            <div class="control-group">
+                <label for="topNSelect">Top N LPARs (Line View):</label>
+                <select id="topNSelect">
+                    <option value="5">Top 5</option>
+                    <option value="10">Top 10</option>
+                    <option value="15">Top 15</option>
+                    <option value="20">Top 20</option>
+                    <option value="all">All</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="startTime">Start Time (HH:MM:SS):</label>
+                <input type="text" id="startTime" placeholder="00:00:00" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
+            </div>
+            <div class="control-group">
+                <label for="endTime">End Time (HH:MM:SS):</label>
+                <input type="text" id="endTime" placeholder="23:59:59" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
+            </div>
+            <div class="control-group">
+                <button id="applyTimeRange" style="padding: 8px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; margin-top: 20px; transition: background 0.2s;">Apply Time Range</button>
+            </div>
         </div>
         
         <div class="stats hidden" id="thresholdStats">
@@ -354,9 +435,9 @@
                         <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold50time">0s</div>
                     </div>
                     <div>
-                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 80%</div>
-                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold80">0.00%</div>
-                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold80time">0s</div>
+                        <div style="font-size: 0.9em; opacity: 0.9;">Time > 75%</div>
+                        <div class="value" style="color: white; font-size: 1.4em;" id="threshold75">0.00%</div>
+                        <div style="font-size: 0.85em; opacity: 0.8; margin-top: 5px;" id="threshold75time">0s</div>
                     </div>
                     <div>
                         <div style="font-size: 0.9em; opacity: 0.9;">Time > 85%</div>
@@ -417,44 +498,227 @@
                     <canvas id="comparisonChart"></canvas>
                 </div>
             </div>
-            <div class="chart-container">
-                <h2>🎯 Resource Distribution</h2>
-                <div class="chart-wrapper">
-                    <canvas id="distributionChart"></canvas>
-                </div>
-            </div>
         </div>
     </div>
 
     <script>
         let parsedData = null;
         let charts = {};
+        let loadedFiles = [];
         
         // File input handler
         document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                document.getElementById('fileName').textContent = file.name;
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('errorMsg').style.display = 'none';
                 
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    try {
-                        parsedData = parseHyptopLog(event.target.result);
-                        displayData();
-                        document.getElementById('loading').style.display = 'none';
-                    } catch (error) {
-                        showError('Error parsing file: ' + error.message);
-                        document.getElementById('loading').style.display = 'none';
-                    }
-                };
-                reader.readAsText(file);
+                processFiles(files);
             }
         });
         
+        // Process multiple files
+        async function processFiles(files) {
+            const filePromises = files.map(file => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        try {
+                            const data = parseHyptopLog(event.target.result, file.name);
+                            resolve({ fileName: file.name, data: data });
+                        } catch (error) {
+                            reject({ fileName: file.name, error: error.message });
+                        }
+                    };
+                    reader.onerror = () => reject({ fileName: file.name, error: 'Failed to read file' });
+                    reader.readAsText(file);
+                });
+            });
+            
+            try {
+                const results = await Promise.all(filePromises);
+                
+                // Add to loaded files
+                results.forEach(result => {
+                    const existingIndex = loadedFiles.findIndex(f => f.fileName === result.fileName);
+                    if (existingIndex >= 0) {
+                        loadedFiles[existingIndex] = result;
+                    } else {
+                        loadedFiles.push(result);
+                    }
+                });
+                
+                // Merge all data chronologically
+                parsedData = mergeMultipleFiles(loadedFiles);
+                
+                updateFileList();
+                displayData();
+                document.getElementById('loading').style.display = 'none';
+            } catch (error) {
+                showError('Error processing files: ' + (error.error || error.message));
+                document.getElementById('loading').style.display = 'none';
+            }
+        }
+        
+        // Update file list display
+        function updateFileList() {
+            const fileListDiv = document.getElementById('fileList');
+            
+            if (loadedFiles.length === 0) {
+                fileListDiv.innerHTML = '';
+                return;
+            }
+            
+            let html = '<div style="margin-top: 20px;">';
+            html += '<h3 style="font-size: 1em; color: #495057; margin-bottom: 10px;">Loaded Files:</h3>';
+            
+            loadedFiles.forEach((file, index) => {
+                const dataPoints = file.data.timestamps.length;
+                const timeRange = dataPoints > 0 ? 
+                    `${file.data.timestamps[0]} - ${file.data.timestamps[dataPoints - 1]}` : 'No data';
+                
+                // Extract date from filename if present (e.g., hyptop_2024-06-18.log)
+                const dateMatch = file.fileName.match(/(\d{4}-\d{2}-\d{2})|(\d{2}-\d{2}-\d{4})|(\d{8})/);
+                const dateInfo = dateMatch ? ` | Date: ${dateMatch[0]}` : '';
+                
+                html += `
+                    <div class="file-item">
+                        <span class="file-item-name">📄 ${file.fileName}</span>
+                        <span class="file-item-info">${dataPoints} data points | ${timeRange}${dateInfo}</span>
+                        <button class="file-item-remove" onclick="removeFile(${index})">Remove</button>
+                    </div>
+                `;
+            });
+            
+            if (loadedFiles.length > 1) {
+                html += '<button class="clear-all-btn" onclick="clearAllFiles()">Clear All Files</button>';
+            }
+            
+            html += '</div>';
+            fileListDiv.innerHTML = html;
+        }
+        
+        // Remove a specific file
+        function removeFile(index) {
+            loadedFiles.splice(index, 1);
+            
+            if (loadedFiles.length === 0) {
+                parsedData = null;
+                updateFileList();
+                document.getElementById('systemInfo').classList.add('hidden');
+                document.getElementById('controls').classList.add('hidden');
+                document.getElementById('charts').classList.add('hidden');
+                document.getElementById('stats').classList.add('hidden');
+                document.getElementById('thresholdStats').classList.add('hidden');
+            } else {
+                parsedData = mergeMultipleFiles(loadedFiles);
+                updateFileList();
+                displayData();
+            }
+        }
+        
+        // Clear all files
+        function clearAllFiles() {
+            loadedFiles = [];
+            parsedData = null;
+            updateFileList();
+            document.getElementById('systemInfo').classList.add('hidden');
+            document.getElementById('controls').classList.add('hidden');
+            document.getElementById('charts').classList.add('hidden');
+            document.getElementById('stats').classList.add('hidden');
+            document.getElementById('thresholdStats').classList.add('hidden');
+        }
+        
+        // Merge data from multiple files as continuous time series
+        function mergeMultipleFiles(files) {
+            if (files.length === 0) return null;
+            if (files.length === 1) {
+                const singleData = files[0].data;
+                const filePrefix = files[0].fileName.split('.')[0];
+                return {
+                    ...singleData,
+                    fileSource: singleData.timestamps.map(() => files[0].fileName),
+                    displayLabels: singleData.timestamps.map(timestamp => `${filePrefix}_${timestamp}`),
+                    pointKeys: singleData.timestamps.map((timestamp, index) => `${files[0].fileName}::${index}::${timestamp}`)
+                };
+            }
+            
+            const merged = {
+                timestamps: [],
+                systems: {},
+                cpuInfo: files[0].data.cpuInfo,
+                fileSource: [],
+                displayLabels: [],
+                pointKeys: []
+            };
+            
+            const ensureSystem = (systemName) => {
+                if (!merged.systems[systemName]) {
+                    merged.systems[systemName] = {
+                        timestamps: [],
+                        core: [],
+                        the: [],
+                        mgm: [],
+                        cores: [],
+                        threads: []
+                    };
+                }
+                return merged.systems[systemName];
+            };
+            
+            // Process files sequentially to create continuous time series
+            files.forEach((file) => {
+                const data = file.data;
+                
+                data.timestamps.forEach((timestamp, tsIndex) => {
+                    const displayLabel = `${file.fileName.split('.')[0]}_${timestamp}`;
+                    const pointKey = `${file.fileName}::${tsIndex}::${timestamp}`;
+                    
+                    merged.timestamps.push(timestamp);
+                    merged.displayLabels.push(displayLabel);
+                    merged.fileSource.push(file.fileName);
+                    merged.pointKeys.push(pointKey);
+                    
+                    Object.keys(merged.systems).forEach((systemName) => {
+                        const mergedSystem = merged.systems[systemName];
+                        mergedSystem.timestamps.push(timestamp);
+                        mergedSystem.cores.push(0);
+                        mergedSystem.threads.push(0);
+                        mergedSystem.core.push(0);
+                        mergedSystem.the.push(0);
+                        mergedSystem.mgm.push(0);
+                    });
+                    
+                    Object.entries(data.systems).forEach(([systemName, systemData]) => {
+                        const mergedSystem = ensureSystem(systemName);
+                        
+                        while (mergedSystem.timestamps.length < merged.timestamps.length) {
+                            mergedSystem.timestamps.push(timestamp);
+                            mergedSystem.cores.push(0);
+                            mergedSystem.threads.push(0);
+                            mergedSystem.core.push(0);
+                            mergedSystem.the.push(0);
+                            mergedSystem.mgm.push(0);
+                        }
+                        
+                        if (tsIndex < systemData.timestamps.length) {
+                            const targetIndex = merged.timestamps.length - 1;
+                            mergedSystem.timestamps[targetIndex] = timestamp;
+                            mergedSystem.cores[targetIndex] = systemData.cores[tsIndex] || 0;
+                            mergedSystem.threads[targetIndex] = systemData.threads[tsIndex] || 0;
+                            mergedSystem.core[targetIndex] = systemData.core[tsIndex] || 0;
+                            mergedSystem.the[targetIndex] = systemData.the[tsIndex] || 0;
+                            mergedSystem.mgm[targetIndex] = systemData.mgm[tsIndex] || 0;
+                        }
+                    });
+                });
+            });
+            
+            return merged;
+        }
+        
         // Parse hyptop log file
-        function parseHyptopLog(content) {
+        function parseHyptopLog(content, fileName) {
             const lines = content.split('\n');
             const data = {
                 timestamps: [],
@@ -520,18 +784,17 @@
         function displayData() {
             if (!parsedData) return;
             
-            // Calculate max sum of total core + total mgm across all timestamps
+            // Calculate max sum of total core across all timestamps
             let maxSum = 0;
             let maxSumIndex = 0;
             for (let i = 0; i < parsedData.timestamps.length; i++) {
-                let totalCore = 0, totalMgm = 0;
+                let totalCore = 0;
                 Object.values(parsedData.systems).forEach(system => {
                     if (i < system.core.length) {
                         totalCore += system.core[i] || 0;
-                        totalMgm += system.mgm[i] || 0;
                     }
                 });
-                const sum = (totalCore + totalMgm) / 100;
+                const sum = totalCore / 100;
                 if (sum > maxSum) {
                     maxSum = sum;
                     maxSumIndex = i;
@@ -574,8 +837,8 @@
             if (iflCount === 0) return null;
             
             const end = endIdx !== null ? endIdx : parsedData.timestamps.length;
-            const thresholds = [50, 80, 85, 90];
-            const counts = { 50: 0, 80: 0, 85: 0, 90: 0 };
+            const thresholds = [50, 75, 85, 90];
+            const counts = { 50: 0, 75: 0, 85: 0, 90: 0 };
             let totalPoints = 0;
             
             // Calculate time interval between samples (in seconds)
@@ -670,14 +933,18 @@
             
             systemInfo.innerHTML = `
                 <h2>📋 System Information</h2>
-                <div class="info-grid">
+                <div class="info-grid" style="grid-template-columns: repeat(6, 1fr);">
                     <div class="info-item">
                         <div class="info-label">Total Partitions</div>
                         <div class="info-value">${systemCount}</div>
                     </div>
                     <div class="info-item">
+                        <div class="info-label">Total Data Points</div>
+                        <div class="info-value">${dataPoints}</div>
+                    </div>
+                    <div class="info-item">
                         <div class="info-label">Time Range</div>
-                        <div class="info-value">${timeRange}</div>
+                        <div class="info-value" style="font-size: 0.9em;">${timeRange}</div>
                     </div>
                     <div class="info-item">
                         <div class="info-label">CPU Info</div>
@@ -705,8 +972,8 @@
             if (thresholdStats) {
                 document.getElementById('threshold50').textContent = thresholdStats[50].percentage + '%';
                 document.getElementById('threshold50time').textContent = thresholdStats[50].absolute;
-                document.getElementById('threshold80').textContent = thresholdStats[80].percentage + '%';
-                document.getElementById('threshold80time').textContent = thresholdStats[80].absolute;
+                document.getElementById('threshold75').textContent = thresholdStats[75].percentage + '%';
+                document.getElementById('threshold75time').textContent = thresholdStats[75].absolute;
                 document.getElementById('threshold85').textContent = thresholdStats[85].percentage + '%';
                 document.getElementById('threshold85time').textContent = thresholdStats[85].absolute;
                 document.getElementById('threshold90').textContent = thresholdStats[90].percentage + '%';
@@ -814,7 +1081,6 @@
             updateMetricChart('mgm', 'mgmChart', 'Mgm %', selectedSystem);
             updateTopSystemsChart();
             updateComparisonChart();
-            updateDistributionChart();
             
             // Update statistics to match the selected partition(s)
             updateStats();
@@ -851,12 +1117,14 @@
             } else if (viewMode === 'stacked') {
                 // Stacked view: show all LPARs
                 const systemEntries = Object.entries(parsedData.systems);
-                const sortedSystems = systemEntries
+                let sortedSystems = systemEntries
                     .map(([name, data]) => ({
                         name,
                         avg: data[metric].reduce((a, b) => a + b, 0) / data[metric].length
                     }))
                     .sort((a, b) => b.avg - a.avg);
+                
+                // No filtering - show all LPARs regardless of metric values
                 
                 // Generate colors for all systems
                 const colorPalette = [
@@ -885,18 +1153,28 @@
                     });
                 });
             } else {
-                // Line view: show top 5 systems
+                // Line view: show top 5 systems (filter mgm > 15%)
                 const systemEntries = Object.entries(parsedData.systems);
-                const topSystems = systemEntries
+                let topSystems = systemEntries
                     .map(([name, data]) => ({
                         name,
                         avg: data[metric].reduce((a, b) => a + b, 0) / data[metric].length
                     }))
-                    .sort((a, b) => b.avg - a.avg)
-                    .slice(0, 5);
+                    .sort((a, b) => b.avg - a.avg);
                 
+                // Get topN value from selector
+                const topNValue = document.getElementById('topNSelect').value;
+                const topN = topNValue === 'all' ? topSystems.length : parseInt(topNValue);
+                
+                // Show top N systems regardless of metric values
+                topSystems = topSystems.slice(0, topN);
+                
+                // Extended color palette for more LPARs
                 const colors = [
-                    '#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b'
+                    '#667eea', '#764ba2', '#f093fb', '#4facfe', '#43e97b',
+                    '#fa709a', '#fee140', '#30cfd0', '#a8edea', '#fed6e3',
+                    '#c471ed', '#f64f59', '#12c2e9', '#f5af19', '#fbc2eb',
+                    '#a1c4fd', '#ffecd2', '#ff9a9e', '#fad0c4', '#ffd1ff'
                 ];
                 
                 topSystems.forEach((sys, idx) => {
@@ -917,35 +1195,29 @@
                 });
             }
             
-            // Calculate max for this specific metric in stacked mode
+            // Calculate max for this specific metric
             let maxMetricSum = 0;
             let maxMetricIndex = 0;
-            if (viewMode === 'stacked' && !systemName) {
-                for (let i = 0; i < parsedData.timestamps.length; i++) {
-                    let totalMetric = 0;
-                    Object.values(parsedData.systems).forEach(system => {
-                        if (i < system[metric].length) {
-                            totalMetric += system[metric][i] || 0;
-                        }
-                    });
-                    if (totalMetric > maxMetricSum) {
-                        maxMetricSum = totalMetric;
-                        maxMetricIndex = i;
+            for (let i = 0; i < parsedData.timestamps.length; i++) {
+                let totalMetric = 0;
+                Object.values(parsedData.systems).forEach(system => {
+                    if (i < system[metric].length) {
+                        totalMetric += system[metric][i] || 0;
                     }
+                });
+                if (totalMetric > maxMetricSum) {
+                    maxMetricSum = totalMetric;
+                    maxMetricIndex = i;
                 }
             }
             
-            const annotationValue = (viewMode === 'stacked' && !systemName) 
-                ? parsedData.timestamps[maxMetricIndex]
-                : parsedData.timestamps[window.maxSumIndex];
-            const annotationLabel = (viewMode === 'stacked' && !systemName)
-                ? `Max ${label}: ${(maxMetricSum / 100).toFixed(2)} at ${parsedData.timestamps[maxMetricIndex]}`
-                : `Max Sum: ${window.maxCoreMgmSum.toFixed(2)} at ${window.maxSumTimestamp}`;
+            const maxMetricValue = maxMetricSum / 100;
+            const maxMetricLabel = (parsedData.displayLabels || parsedData.timestamps)[maxMetricIndex];
             
             charts[metric] = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: parsedData.timestamps,
+                    labels: parsedData.displayLabels || parsedData.timestamps,
                     datasets: datasets
                 },
                 options: {
@@ -958,26 +1230,18 @@
                     plugins: {
                         annotation: {
                             annotations: {
-                                maxSumLine: {
-                                    type: 'line',
-                                    scaleID: 'x',
-                                    value: annotationValue,
-                                    borderColor: 'rgb(255, 99, 132)',
-                                    borderWidth: 2,
-                                    borderDash: [10, 5],
-                                    label: {
-                                        display: true,
-                                        content: annotationLabel,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 99, 132, 0.9)',
-                                        color: 'white',
-                                        font: {
-                                            size: 11,
-                                            weight: 'bold'
-                                        },
-                                        padding: 6,
-                                        rotation: 0
-                                    }
+                                maxSumLabel: {
+                                    type: 'label',
+                                    xValue: ({chart}) => chart.scales.x.max - (chart.scales.x.max - chart.scales.x.min) * 0.15,
+                                    yValue: ({chart}) => chart.scales.y.max - (chart.scales.y.max - chart.scales.y.min) * 0.05,
+                                    content: `Max sum cores: ${maxMetricValue.toFixed(2)} at ${parsedData.timestamps[maxMetricIndex]}`,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 10,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6
                                 }
                             }
                         },
@@ -1002,7 +1266,7 @@
                             callbacks: {
                                 label: function(context) {
                                     if (viewMode === 'stacked' && !systemName) {
-                                        // In stacked view, show only top 5
+                                        // In stacked view, show based on metric type
                                         const dataIndex = context.dataIndex;
                                         const allValues = [];
                                         
@@ -1018,14 +1282,25 @@
                                         // Sort by value descending
                                         allValues.sort((a, b) => b.value - a.value);
                                         
-                                        // Only show if this LPAR is in top 5
-                                        const top5 = allValues.slice(0, 5);
-                                        const isTop5 = top5.some(item => item.name === context.dataset.label.split(' (')[0]);
-                                        
-                                        if (isTop5) {
-                                            return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`;
+                                        if (metric === 'mgm') {
+                                            // For mgm chart: show all LPARs with value > 15%
+                                            const currentValue = context.parsed.y;
+                                            if (currentValue > 15) {
+                                                return `${context.dataset.label}: ${currentValue.toFixed(2)}%`;
+                                            }
+                                            return null; // Hide LPARs <= 15%
+                                        } else {
+                                            // For other charts: show based on topN selection
+                                            const topNValue = document.getElementById('topNSelect').value;
+                                            const topN = topNValue === 'all' ? allValues.length : parseInt(topNValue);
+                                            const topNValues = allValues.slice(0, topN);
+                                            const isInTopN = topNValues.some(item => item.name === context.dataset.label.split(' (')[0]);
+                                            
+                                            if (isInTopN) {
+                                                return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`;
+                                            }
+                                            return null; // Hide others
                                         }
-                                        return null; // Hide others
                                     } else {
                                         // Default label for line view or single partition
                                         return `${context.dataset.label}: ${context.parsed.y.toFixed(2)}%`;
@@ -1034,6 +1309,10 @@
                                 afterBody: function(context) {
                                     if (context.length > 0) {
                                         const dataIndex = context[0].dataIndex;
+                                        
+                                        // Show file source if multiple files loaded
+                                        const fileInfo = parsedData.fileSource && parsedData.fileSource.length > 1 ? 
+                                            [`Source: ${parsedData.fileSource[dataIndex]}`, ''] : [];
                                         
                                         if (viewMode === 'stacked' && !systemName) {
                                             // In stacked view, show sum of all LPARs for this metric
@@ -1045,7 +1324,7 @@
                                             });
                                             
                                             return [
-                                                '',
+                                                ...fileInfo,
                                                 '─────────────────',
                                                 `Total ${label}: ${(totalMetric / 100).toFixed(2)}`
                                             ];
@@ -1064,7 +1343,7 @@
                                             const sumCoreMgm = (totalCore + totalMgm) / 100;
                                             
                                             return [
-                                                '',
+                                                ...fileInfo,
                                                 '─────────────────',
                                                 `Total Core: ${(totalCore / 100).toFixed(2)}`,
                                                 `Total The: ${(totalThe / 100).toFixed(2)}`,
@@ -1092,10 +1371,11 @@
                                     const xScale = chart.scales.x;
                                     // Get the visible timestamp range
                                     const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
-                                    const startTimestamp = visibleLabels[0];
-                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
-                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
-                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    const startLabel = visibleLabels[0];
+                                    const endLabel = visibleLabels[visibleLabels.length - 1];
+                                    const labelSource = parsedData.displayLabels || parsedData.timestamps;
+                                    const startIdx = labelSource.indexOf(startLabel);
+                                    const endIdx = labelSource.indexOf(endLabel) + 1;
                                     
                                     // Sync zoom across all metric charts
                                     ['core', 'the', 'mgm'].forEach(m => {
@@ -1106,6 +1386,7 @@
                                     
                                     updateStats(startIdx, endIdx);
                                     updateMaxSumAnnotation(startIdx, endIdx);
+                                    updateOverallCpuAnnotations(startIdx, endIdx);
                                 }
                             },
                             pan: {
@@ -1115,10 +1396,11 @@
                                     const xScale = chart.scales.x;
                                     // Get the visible timestamp range
                                     const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
-                                    const startTimestamp = visibleLabels[0];
-                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
-                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
-                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    const startLabel = visibleLabels[0];
+                                    const endLabel = visibleLabels[visibleLabels.length - 1];
+                                    const labelSource = parsedData.displayLabels || parsedData.timestamps;
+                                    const startIdx = labelSource.indexOf(startLabel);
+                                    const endIdx = labelSource.indexOf(endLabel) + 1;
                                     
                                     // Sync pan across all metric charts
                                     ['core', 'the', 'mgm'].forEach(m => {
@@ -1129,6 +1411,7 @@
                                     
                                     updateStats(startIdx, endIdx);
                                     updateMaxSumAnnotation(startIdx, endIdx);
+                                    updateOverallCpuAnnotations(startIdx, endIdx);
                                 }
                             },
                             limits: {
@@ -1217,10 +1500,11 @@
                 return;
             }
             
-            // Calculate overall CPU% for each timestamp and find max
+            // Calculate overall CPU% for each timestamp and find max and average
             const overallCpuData = [];
             let maxCpu = 0;
             let maxCpuIndex = 0;
+            let sumCpu = 0;
             for (let i = 0; i < parsedData.timestamps.length; i++) {
                 let totalCore = 0, totalMgm = 0;
                 Object.values(parsedData.systems).forEach(system => {
@@ -1231,16 +1515,25 @@
                 });
                 const overallCpu = ((totalCore + totalMgm) / 100) / iflCount * 100;
                 overallCpuData.push(overallCpu);
+                sumCpu += overallCpu;
                 if (overallCpu > maxCpu) {
                     maxCpu = overallCpu;
                     maxCpuIndex = i;
                 }
             }
+            const avgCpu = sumCpu / overallCpuData.length;
+            
+            // Calculate percentiles
+            const sortedCpuData = [...overallCpuData].sort((a, b) => a - b);
+            const p95Index = Math.floor(sortedCpuData.length * 0.95);
+            const p99Index = Math.floor(sortedCpuData.length * 0.99);
+            const p95 = sortedCpuData[p95Index];
+            const p99 = sortedCpuData[p99Index];
             
             charts.overallCpu = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: parsedData.timestamps,
+                    labels: parsedData.displayLabels || parsedData.timestamps,
                     datasets: [{
                         label: `Overall CPU % (IFL: ${iflCount})`,
                         data: overallCpuData,
@@ -1266,26 +1559,93 @@
                     plugins: {
                         annotation: {
                             annotations: {
-                                maxCpuLine: {
-                                    type: 'line',
-                                    scaleID: 'x',
-                                    value: parsedData.timestamps[maxCpuIndex],
-                                    borderColor: 'rgb(255, 99, 132)',
+
+                                maxCpuPoint: {
+                                    type: 'point',
+                                    xValue: maxCpuIndex,
+                                    yValue: maxCpu,
+                                    backgroundColor: 'rgb(255, 99, 132)',
+                                    borderColor: 'white',
                                     borderWidth: 2,
-                                    borderDash: [10, 5],
-                                    label: {
-                                        display: true,
-                                        content: `Max CPU: ${maxCpu.toFixed(2)}% at ${parsedData.timestamps[maxCpuIndex]}`,
-                                        position: 'start',
-                                        backgroundColor: 'rgba(255, 99, 132, 0.9)',
-                                        color: 'white',
-                                        font: {
-                                            size: 11,
-                                            weight: 'bold'
-                                        },
-                                        padding: 6,
-                                        rotation: 0
-                                    }
+                                    radius: 5
+                                },
+                                maxCpuLabel: {
+                                    type: 'label',
+                                    xValue: maxCpuIndex,
+                                    yValue: maxCpu,
+                                    content: `max cpu%: ${maxCpu.toFixed(2)}% at ${parsedData.timestamps[maxCpuIndex]}`,
+                                    backgroundColor: 'rgba(255, 99, 132, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 10,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6,
+                                    xAdjust: maxCpuIndex < parsedData.timestamps.length * 0.1 ? 100 : 0,
+                                    yAdjust: maxCpu > 85 ? 25 : -25
+                                },
+                                avgCpuLine: {
+                                    type: 'line',
+                                    scaleID: 'y',
+                                    value: avgCpu,
+                                    borderColor: 'rgb(75, 192, 192)',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5]
+                                },
+                                p95Line: {
+                                    type: 'line',
+                                    scaleID: 'y',
+                                    value: p95,
+                                    borderColor: 'rgb(255, 159, 64)',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5]
+                                },
+                                p99Line: {
+                                    type: 'line',
+                                    scaleID: 'y',
+                                    value: p99,
+                                    borderColor: 'rgb(153, 102, 255)',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5]
+                                },
+                                p99Label: {
+                                    type: 'label',
+                                    xValue: ({chart}) => chart.scales.x.max - (chart.scales.x.max - chart.scales.x.min) * 0.15,
+                                    yValue: ({chart}) => chart.scales.y.max - (chart.scales.y.max - chart.scales.y.min) * 0.05,
+                                    content: `99th: ${p99.toFixed(2)}%`,
+                                    backgroundColor: 'rgba(153, 102, 255, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 10,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6
+                                },
+                                p95Label: {
+                                    type: 'label',
+                                    xValue: ({chart}) => chart.scales.x.max - (chart.scales.x.max - chart.scales.x.min) * 0.15,
+                                    yValue: ({chart}) => chart.scales.y.max - (chart.scales.y.max - chart.scales.y.min) * 0.18,
+                                    content: `95th: ${p95.toFixed(2)}%`,
+                                    backgroundColor: 'rgba(255, 159, 64, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 10,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6
+                                },
+                                avgLabel: {
+                                    type: 'label',
+                                    xValue: ({chart}) => chart.scales.x.max - (chart.scales.x.max - chart.scales.x.min) * 0.15,
+                                    yValue: ({chart}) => chart.scales.y.max - (chart.scales.y.max - chart.scales.y.min) * 0.31,
+                                    content: `Avg: ${avgCpu.toFixed(2)}%`,
+                                    backgroundColor: 'rgba(75, 192, 192, 0.9)',
+                                    color: 'white',
+                                    font: {
+                                        size: 10,
+                                        weight: 'bold'
+                                    },
+                                    padding: 6
                                 }
                             }
                         },
@@ -1314,6 +1674,11 @@
                                 afterBody: function(context) {
                                     if (context.length > 0) {
                                         const dataIndex = context[0].dataIndex;
+                                        
+                                        // Show file source if multiple files loaded
+                                        const fileInfo = parsedData.fileSource && parsedData.fileSource.length > 1 ? 
+                                            [`Source: ${parsedData.fileSource[dataIndex]}`, ''] : [];
+                                        
                                         let totalCore = 0, totalMgm = 0;
                                         
                                         Object.values(parsedData.systems).forEach(system => {
@@ -1324,7 +1689,7 @@
                                         });
                                         
                                         return [
-                                            '',
+                                            ...fileInfo,
                                             '─────────────────',
                                             `Total Core: ${(totalCore / 100).toFixed(2)}`,
                                             `Total Mgm: ${(totalMgm / 100).toFixed(2)}`,
@@ -1350,10 +1715,11 @@
                                     const xScale = chart.scales.x;
                                     // Get the visible timestamp range
                                     const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
-                                    const startTimestamp = visibleLabels[0];
-                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
-                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
-                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    const startLabel = visibleLabels[0];
+                                    const endLabel = visibleLabels[visibleLabels.length - 1];
+                                    const labelSource = parsedData.displayLabels || parsedData.timestamps;
+                                    const startIdx = labelSource.indexOf(startLabel);
+                                    const endIdx = labelSource.indexOf(endLabel) + 1;
                                     
                                     // Sync zoom to all metric charts
                                     ['core', 'the', 'mgm'].forEach(m => {
@@ -1364,6 +1730,7 @@
                                     
                                     updateStats(startIdx, endIdx);
                                     updateMaxSumAnnotation(startIdx, endIdx);
+                                    updateOverallCpuAnnotations(startIdx, endIdx);
                                 }
                             },
                             pan: {
@@ -1373,10 +1740,11 @@
                                     const xScale = chart.scales.x;
                                     // Get the visible timestamp range
                                     const visibleLabels = chart.scales.x.ticks.map(tick => tick.label);
-                                    const startTimestamp = visibleLabels[0];
-                                    const endTimestamp = visibleLabels[visibleLabels.length - 1];
-                                    const startIdx = parsedData.timestamps.indexOf(startTimestamp);
-                                    const endIdx = parsedData.timestamps.indexOf(endTimestamp) + 1;
+                                    const startLabel = visibleLabels[0];
+                                    const endLabel = visibleLabels[visibleLabels.length - 1];
+                                    const labelSource = parsedData.displayLabels || parsedData.timestamps;
+                                    const startIdx = labelSource.indexOf(startLabel);
+                                    const endIdx = labelSource.indexOf(endLabel) + 1;
                                     
                                     // Sync pan to all metric charts
                                     ['core', 'the', 'mgm'].forEach(m => {
@@ -1387,6 +1755,7 @@
                                     
                                     updateStats(startIdx, endIdx);
                                     updateMaxSumAnnotation(startIdx, endIdx);
+                                    updateOverallCpuAnnotations(startIdx, endIdx);
                                 }
                             },
                             limits: {
@@ -1546,47 +1915,6 @@
             });
         }
         
-        // Distribution chart
-        function updateDistributionChart() {
-            const ctx = document.getElementById('distributionChart');
-            
-            if (charts.distribution) {
-                charts.distribution.destroy();
-            }
-            
-            const systemCounts = Object.keys(parsedData.systems).length;
-            const totalCores = Object.values(parsedData.systems)
-                .reduce((sum, sys) => sum + (sys.cores[0] || 0), 0);
-            const totalThreads = Object.values(parsedData.systems)
-                .reduce((sum, sys) => sum + (sys.threads[0] || 0), 0);
-            
-            charts.distribution = new Chart(ctx, {
-                type: 'doughnut',
-                data: {
-                    labels: ['Systems', 'Total Cores', 'Total Threads'],
-                    datasets: [{
-                        data: [systemCounts, totalCores, totalThreads],
-                        backgroundColor: [
-                            'rgba(102, 126, 234, 0.8)',
-                            'rgba(118, 75, 162, 0.8)',
-                            'rgba(240, 147, 251, 0.8)'
-                        ],
-                        borderWidth: 2,
-                        borderColor: '#fff'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            position: 'bottom'
-                        }
-                    }
-                }
-            });
-        }
-        
         // Show error message
         function showError(message) {
             const errorMsg = document.getElementById('errorMsg');
@@ -1601,14 +1929,13 @@
             let maxSumIndex = startIdx;
             
             for (let i = startIdx; i < end; i++) {
-                let totalCore = 0, totalMgm = 0;
+                let totalCore = 0;
                 Object.values(parsedData.systems).forEach(system => {
                     if (i < system.core.length) {
                         totalCore += system.core[i] || 0;
-                        totalMgm += system.mgm[i] || 0;
                     }
                 });
-                const sum = (totalCore + totalMgm) / 100;
+                const sum = totalCore / 100;
                 if (sum > maxSum) {
                     maxSum = sum;
                     maxSumIndex = i;
@@ -1618,16 +1945,109 @@
             // Update all metric charts with new annotation
             ['core', 'the', 'mgm'].forEach(metric => {
                 if (charts[metric]) {
-                    const annotation = charts[metric].options.plugins.annotation.annotations.maxSumLine;
-                    annotation.value = parsedData.timestamps[maxSumIndex];
-                    annotation.label.content = `Max Sum: ${maxSum.toFixed(2)} at ${parsedData.timestamps[maxSumIndex]}`;
-                    // Force update with default mode to ensure annotation is redrawn without showing points
+                    // Calculate max for this specific metric in the visible range
+                    let maxMetricSum = 0;
+                    let maxMetricIndex = startIdx;
+                    
+                    for (let i = startIdx; i < end; i++) {
+                        let totalMetric = 0;
+                        Object.values(parsedData.systems).forEach(system => {
+                            if (i < system[metric].length) {
+                                totalMetric += system[metric][i] || 0;
+                            }
+                        });
+                        if (totalMetric > maxMetricSum) {
+                            maxMetricSum = totalMetric;
+                            maxMetricIndex = i;
+                        }
+                    }
+                    
+                    const maxMetricValue = maxMetricSum / 100;
+                    
+                    const labelAnnotation = charts[metric].options.plugins.annotation.annotations.maxSumLabel;
+                    
+                    labelAnnotation.content = `Max sum cores: ${maxMetricValue.toFixed(2)} at ${parsedData.timestamps[maxMetricIndex]}`;
+                    
                     charts[metric].update();
                 }
             });
         }
         
         // Reset zoom function
+
+        // Update overall CPU annotations for a given range
+        function updateOverallCpuAnnotations(startIdx = 0, endIdx = null) {
+            if (!charts.overallCpu) return;
+            
+            const iflCount = parsedData.cpuInfo ? 
+                parseInt((parsedData.cpuInfo.match(/IFL\((\d+)\)/) || [])[1]) || 0 : 0;
+            
+            if (iflCount === 0) return;
+            
+            const end = endIdx !== null ? endIdx : parsedData.timestamps.length;
+            let maxCpu = 0;
+            let maxCpuIndex = startIdx;
+            let sumCpu = 0;
+            let count = 0;
+            const cpuValues = [];
+            
+            for (let i = startIdx; i < end; i++) {
+                let totalCore = 0, totalMgm = 0;
+                Object.values(parsedData.systems).forEach(system => {
+                    if (i < system.core.length) {
+                        totalCore += system.core[i] || 0;
+                        totalMgm += system.mgm[i] || 0;
+                    }
+                });
+                const overallCpu = ((totalCore + totalMgm) / 100) / iflCount * 100;
+                cpuValues.push(overallCpu);
+                sumCpu += overallCpu;
+                count++;
+                if (overallCpu > maxCpu) {
+                    maxCpu = overallCpu;
+                    maxCpuIndex = i;
+                }
+            }
+            
+            const avgCpu = count > 0 ? sumCpu / count : 0;
+            
+            // Calculate percentiles
+            const sortedCpuValues = [...cpuValues].sort((a, b) => a - b);
+            const p95Index = Math.floor(sortedCpuValues.length * 0.95);
+            const p99Index = Math.floor(sortedCpuValues.length * 0.99);
+            const p95 = sortedCpuValues[p95Index] || 0;
+            const p99 = sortedCpuValues[p99Index] || 0;
+            
+            // Update annotations
+            const maxPointAnnotation = charts.overallCpu.options.plugins.annotation.annotations.maxCpuPoint;
+            const maxLabelAnnotation = charts.overallCpu.options.plugins.annotation.annotations.maxCpuLabel;
+            const avgLineAnnotation = charts.overallCpu.options.plugins.annotation.annotations.avgCpuLine;
+            const p95LineAnnotation = charts.overallCpu.options.plugins.annotation.annotations.p95Line;
+            const p99LineAnnotation = charts.overallCpu.options.plugins.annotation.annotations.p99Line;
+            const avgLabelAnnotation = charts.overallCpu.options.plugins.annotation.annotations.avgLabel;
+            const p95LabelAnnotation = charts.overallCpu.options.plugins.annotation.annotations.p95Label;
+            const p99LabelAnnotation = charts.overallCpu.options.plugins.annotation.annotations.p99Label;
+            
+            maxPointAnnotation.xValue = maxCpuIndex;
+            maxPointAnnotation.yValue = maxCpu;
+            
+            maxLabelAnnotation.xValue = maxCpuIndex;
+            maxLabelAnnotation.yValue = maxCpu;
+            maxLabelAnnotation.content = `max cpu%: ${maxCpu.toFixed(2)}% at ${parsedData.timestamps[maxCpuIndex]}`;
+            maxLabelAnnotation.xAdjust = maxCpuIndex < parsedData.timestamps.length * 0.1 ? 100 : 0;
+            
+            avgLineAnnotation.value = avgCpu;
+            p95LineAnnotation.value = p95;
+            p99LineAnnotation.value = p99;
+            
+            p99LabelAnnotation.content = `99th: ${p99.toFixed(2)}%`;
+            p95LabelAnnotation.content = `95th: ${p95.toFixed(2)}%`;
+            avgLabelAnnotation.content = `Avg: ${avgCpu.toFixed(2)}%`;
+            
+            charts.overallCpu.update();
+        }
+        
+
         function resetZoom() {
             // Reset all metric charts
             if (charts.core) charts.core.resetZoom();
@@ -1640,11 +2060,87 @@
             
             // Reset max sum annotation to full range
             updateMaxSumAnnotation();
+            
+            // Reset overall CPU annotations to full range
+            updateOverallCpuAnnotations();
+            
+            // Clear time range inputs
+            document.getElementById('startTime').value = '';
+            document.getElementById('endTime').value = '';
         }
         
         // Event listeners for controls
         document.getElementById('systemSelect').addEventListener('change', updateCharts);
         document.getElementById('viewModeSelect').addEventListener('change', updateCharts);
+        document.getElementById('topNSelect').addEventListener('change', updateCharts);
+
+        
+        // Time range selection handler
+        document.getElementById('applyTimeRange').addEventListener('click', function() {
+            const startTimeInput = document.getElementById('startTime').value.trim();
+            const endTimeInput = document.getElementById('endTime').value.trim();
+            
+            if (!startTimeInput || !endTimeInput) {
+                alert('Please enter both start and end times in HH:MM:SS format');
+                return;
+            }
+            
+            // Validate time format
+            const timeRegex = /^([0-1]?[0-9]|2[0-3]):([0-5][0-9]):([0-5][0-9])$/;
+            if (!timeRegex.test(startTimeInput) || !timeRegex.test(endTimeInput)) {
+                alert('Invalid time format. Please use HH:MM:SS format (e.g., 14:30:00)');
+                return;
+            }
+            
+            // Find indices for start and end times
+            const timestamps = parsedData.timestamps;
+            let startIdx = -1;
+            let endIdx = -1;
+            
+            // Find closest matching timestamps
+            for (let i = 0; i < timestamps.length; i++) {
+                if (startIdx === -1 && timestamps[i] >= startTimeInput) {
+                    startIdx = i;
+                }
+                if (timestamps[i] <= endTimeInput) {
+                    endIdx = i;
+                }
+            }
+            
+            // Validate indices
+            if (startIdx === -1 || endIdx === -1 || startIdx >= endIdx) {
+                alert('Invalid time range. Please ensure:\n- Start time is before end time\n- Times exist in the loaded data\n- Data range: ' + timestamps[0] + ' to ' + timestamps[timestamps.length - 1]);
+                return;
+            }
+            
+            // Apply zoom to all charts
+            const labelSource = parsedData.displayLabels || parsedData.timestamps;
+            const startLabel = labelSource[startIdx];
+            const endLabel = labelSource[endIdx];
+            
+            // Calculate scale positions
+            const totalPoints = timestamps.length;
+            const minScale = (startIdx / totalPoints) * totalPoints;
+            const maxScale = (endIdx / totalPoints) * totalPoints;
+            
+            // Zoom all metric charts
+            ['core', 'the', 'mgm'].forEach(metric => {
+                if (charts[metric]) {
+                    charts[metric].zoomScale('x', {min: minScale, max: maxScale}, 'default');
+                }
+            });
+            
+            // Zoom overall CPU chart
+            if (charts.overallCpu) {
+                charts.overallCpu.zoomScale('x', {min: minScale, max: maxScale}, 'default');
+            }
+            
+            // Update statistics for the selected range
+            updateStats(startIdx, endIdx + 1);
+            updateMaxSumAnnotation(startIdx, endIdx + 1);
+            updateOverallCpuAnnotations(startIdx, endIdx + 1);
+        });
+
     </script>
     
     <footer style="text-align: center; padding: 15px 20px; background: transparent; color: #999; font-size: 0.75em; margin-top: 20px;">
