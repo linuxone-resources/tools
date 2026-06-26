@@ -363,7 +363,7 @@
         <div class="header">
             <h1>📊 Hyptop Log Analyzer</h1>
             <p>Upload and visualize your hyptop performance data</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.2 - Multi-File Support, Time Range Selection & Percentiles</p>
+            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.3 - Multi-File Support, Time Range Selection & Percentiles</p>
         </div>
         
         <div class="upload-section">
@@ -410,6 +410,15 @@
                     <option value="15">Top 15</option>
                     <option value="20">Top 20</option>
                     <option value="all">All</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="sortMethodSelect">Core% Sort By:</label>
+                <select id="sortMethodSelect">
+                    <option value="avg">Top Avg%</option>
+                    <option value="max">Top Core%</option>
+                    <option value="p99">Top 99th Percentile</option>
+                    <option value="p95">Top 95th Percentile</option>
                 </select>
             </div>
             <div class="control-group">
@@ -1153,20 +1162,43 @@
                     });
                 });
             } else {
-                // Line view: show top 5 systems (filter mgm > 15%)
+                // Line view: show top N systems
                 const systemEntries = Object.entries(parsedData.systems);
-                let topSystems = systemEntries
-                    .map(([name, data]) => ({
-                        name,
-                        avg: data[metric].reduce((a, b) => a + b, 0) / data[metric].length
-                    }))
-                    .sort((a, b) => b.avg - a.avg);
+                
+                // Get sort method (only applies to 'core' metric)
+                const sortMethod = metric === 'core' ? document.getElementById('sortMethodSelect').value : 'avg';
+                
+                let topSystems = systemEntries.map(([name, data]) => {
+                    const values = data[metric];
+                    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                    const max = Math.max(...values);
+                    
+                    // Calculate percentiles
+                    const sortedValues = [...values].sort((a, b) => a - b);
+                    const p95Index = Math.floor(sortedValues.length * 0.95);
+                    const p99Index = Math.floor(sortedValues.length * 0.99);
+                    const p95 = sortedValues[p95Index] || 0;
+                    const p99 = sortedValues[p99Index] || 0;
+                    
+                    return { name, avg, max, p95, p99 };
+                });
+                
+                // Sort based on selected method
+                if (sortMethod === 'max') {
+                    topSystems.sort((a, b) => b.max - a.max);
+                } else if (sortMethod === 'p99') {
+                    topSystems.sort((a, b) => b.p99 - a.p99);
+                } else if (sortMethod === 'p95') {
+                    topSystems.sort((a, b) => b.p95 - a.p95);
+                } else {
+                    topSystems.sort((a, b) => b.avg - a.avg);
+                }
                 
                 // Get topN value from selector
                 const topNValue = document.getElementById('topNSelect').value;
                 const topN = topNValue === 'all' ? topSystems.length : parseInt(topNValue);
                 
-                // Show top N systems regardless of metric values
+                // Show top N systems
                 topSystems = topSystems.slice(0, topN);
                 
                 // Extended color palette for more LPARs
@@ -2073,6 +2105,7 @@
         document.getElementById('systemSelect').addEventListener('change', updateCharts);
         document.getElementById('viewModeSelect').addEventListener('change', updateCharts);
         document.getElementById('topNSelect').addEventListener('change', updateCharts);
+        document.getElementById('sortMethodSelect').addEventListener('change', updateCharts);
 
         
         // Time range selection handler
