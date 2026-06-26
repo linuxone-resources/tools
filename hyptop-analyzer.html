@@ -222,30 +222,31 @@
         }
         
         .stats {
-            padding: 20px 40px;
+            padding: 8px 40px;
             background: #f8f9fa;
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 6px;
         }
         
         .stat-card {
             background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 6px 8px;
+            border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
         
         .stat-card h3 {
-            font-size: 0.9em;
+            font-size: 0.65em;
             color: #6c757d;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
         
         .stat-card .value {
-            font-size: 1.8em;
+            font-size: 0.5em;
             font-weight: bold;
             color: #667eea;
+            line-height: 1.2;
         }
         
         .charts {
@@ -265,10 +266,10 @@
         .zoom-info {
             background: #e8f4f8;
             border-left: 4px solid #667eea;
-            padding: 15px 20px;
-            margin-bottom: 20px;
+            padding: 8px 20px;
+            margin-bottom: 15px;
             border-radius: 6px;
-            font-size: 0.95em;
+            font-size: 0.9em;
             color: #495057;
         }
         
@@ -363,7 +364,7 @@
         <div class="header">
             <h1>📊 Hyptop Log Analyzer</h1>
             <p>Upload and visualize your hyptop performance data</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.4 - Multi-File Support, Time Range Selection & Percentiles</p>
+            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.5 - Multi-File Support, Time Range Selection & Percentiles</p>
         </div>
         
         <div class="upload-section">
@@ -748,7 +749,8 @@
                 const timestampMatch = line.match(/^(\d{2}:\d{2}:\d{2})\s+cpu-t:\s+(.+)/);
                 if (timestampMatch) {
                     currentTimestamp = timestampMatch[1];
-                    data.cpuInfo = timestampMatch[2];
+                    // Remove "?=help" from CPU info
+                    data.cpuInfo = timestampMatch[2].replace(/\s*\?=help\s*$/, '');
                     data.timestamps.push(currentTimestamp);
                     continue;
                 }
@@ -1002,17 +1004,39 @@
                 // If a specific partition is selected, use only that one
                 systemsToAverage = [selectedSystem];
             } else {
-                // If "All Partitions", use top 5 by average core%
+                // If "All Partitions", use top N based on sort method
                 const systemEntries = Object.entries(parsedData.systems);
-                const topSystems = systemEntries
-                    .map(([name, data]) => ({
-                        name,
-                        avg: data.core.reduce((a, b) => a + b, 0) / data.core.length
-                    }))
-                    .sort((a, b) => b.avg - a.avg)
-                    .slice(0, 5)
-                    .map(s => s.name);
-                systemsToAverage = topSystems;
+                const sortMethod = document.getElementById('sortMethodSelect').value;
+                const topNValue = document.getElementById('topNSelect').value;
+                const topN = topNValue === 'all' ? systemEntries.length : parseInt(topNValue);
+                
+                let topSystems = systemEntries.map(([name, data]) => {
+                    const values = data.core;
+                    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                    const max = Math.max(...values);
+                    
+                    // Calculate percentiles
+                    const sortedValues = [...values].sort((a, b) => a - b);
+                    const p95Index = Math.floor(sortedValues.length * 0.95);
+                    const p99Index = Math.floor(sortedValues.length * 0.99);
+                    const p95 = sortedValues[p95Index] || 0;
+                    const p99 = sortedValues[p99Index] || 0;
+                    
+                    return { name, avg, max, p95, p99 };
+                });
+                
+                // Sort based on selected method
+                if (sortMethod === 'max') {
+                    topSystems.sort((a, b) => b.max - a.max);
+                } else if (sortMethod === 'p99') {
+                    topSystems.sort((a, b) => b.p99 - a.p99);
+                } else if (sortMethod === 'p95') {
+                    topSystems.sort((a, b) => b.p95 - a.p95);
+                } else {
+                    topSystems.sort((a, b) => b.avg - a.avg);
+                }
+                
+                systemsToAverage = topSystems.slice(0, topN).map(s => s.name);
             }
             
             Object.entries(parsedData.systems).forEach(([name, system]) => {
@@ -1036,42 +1060,56 @@
                 }
             });
             
-            // Calculate individual averages for each partition
+            // Calculate individual statistics for each LPAR
             let partitionStats = [];
             systemsToAverage.forEach(name => {
                 const system = parsedData.systems[name];
-                let pCore = 0, pThe = 0, pMgm = 0, pCount = 0;
+                let coreValues = [];
+                let mgmSum = 0, mgmCount = 0;
                 
                 const end = endIdx !== null ? endIdx : system.core.length;
                 for (let i = startIdx; i < end; i++) {
                     if (i < system.core.length) {
-                        pCore += system.core[i] || 0;
-                        pThe += system.the[i] || 0;
-                        pMgm += system.mgm[i] || 0;
-                        pCount++;
+                        coreValues.push(system.core[i] || 0);
+                        mgmSum += system.mgm[i] || 0;
+                        mgmCount++;
                     }
                 }
                 
+                // Calculate metrics for this LPAR
+                const maxCore = coreValues.length > 0 ? Math.max(...coreValues).toFixed(2) : '0.00';
+                const avgCore = coreValues.length > 0 ? (coreValues.reduce((a, b) => a + b, 0) / coreValues.length).toFixed(2) : '0.00';
+                const avgMgm = mgmCount > 0 ? (mgmSum / mgmCount).toFixed(2) : '0.00';
+                
+                // Calculate percentiles
+                const sortedCore = [...coreValues].sort((a, b) => a - b);
+                const p95Index = Math.floor(sortedCore.length * 0.95);
+                const p99Index = Math.floor(sortedCore.length * 0.99);
+                const p95Core = sortedCore.length > 0 ? sortedCore[p95Index].toFixed(2) : '0.00';
+                const p99Core = sortedCore.length > 0 ? sortedCore[p99Index].toFixed(2) : '0.00';
+                
                 partitionStats.push({
                     name: name,
-                    avgCore: pCount > 0 ? (pCore / pCount).toFixed(2) : '0.00',
-                    avgThe: pCount > 0 ? (pThe / pCount).toFixed(2) : '0.00',
-                    avgMgm: pCount > 0 ? (pMgm / pCount).toFixed(2) : '0.00'
+                    maxCore: maxCore,
+                    p99Core: p99Core,
+                    p95Core: p95Core,
+                    avgCore: avgCore,
+                    avgMgm: avgMgm
                 });
             });
             
-            // Build HTML for stats cards (no peak partition card)
+            // Build HTML for individual LPAR stats cards
             let statsHTML = '';
-            
-            // Add individual partition stats
             partitionStats.forEach(stat => {
                 statsHTML += `
                     <div class="stat-card">
                         <h3>${stat.name}</h3>
-                        <div class="value" style="font-size: 0.9em;">
-                            Avg Core: ${stat.avgCore}%<br>
-                            Avg The: ${stat.avgThe}%<br>
-                            Avg Mgm: ${stat.avgMgm}%
+                        <div class="value">
+                            Max: ${stat.maxCore}%<br>
+                            99th: ${stat.p99Core}%<br>
+                            95th: ${stat.p95Core}%<br>
+                            Avg: ${stat.avgCore}%<br>
+                            Mgm: ${stat.avgMgm}%
                         </div>
                     </div>
                 `;
