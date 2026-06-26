@@ -363,7 +363,7 @@
         <div class="header">
             <h1>📊 Hyptop Log Analyzer</h1>
             <p>Upload and visualize your hyptop performance data</p>
-            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.3 - Multi-File Support, Time Range Selection & Percentiles</p>
+            <p style="font-size: 0.9em; opacity: 0.8; margin-top: 10px;">Version 2.3.4 - Multi-File Support, Time Range Selection & Percentiles</p>
         </div>
         
         <div class="upload-section">
@@ -388,51 +388,7 @@
         
         <div class="system-info hidden" id="systemInfo"></div>
         
-        <div class="controls hidden" id="controls">
-            <div class="control-group">
-                <label for="systemSelect">Partition:</label>
-                <select id="systemSelect">
-                    <option value="">Select a partition</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="viewModeSelect">View Mode:</label>
-                <select id="viewModeSelect">
-                    <option value="line">Line Chart</option>
-                    <option value="stacked">Stacked Area</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="topNSelect">Top N LPARs (Line View):</label>
-                <select id="topNSelect">
-                    <option value="5">Top 5</option>
-                    <option value="10">Top 10</option>
-                    <option value="15">Top 15</option>
-                    <option value="20">Top 20</option>
-                    <option value="all">All</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="sortMethodSelect">Core% Sort By:</label>
-                <select id="sortMethodSelect">
-                    <option value="avg">Top Avg%</option>
-                    <option value="max">Top Core%</option>
-                    <option value="p99">Top 99th Percentile</option>
-                    <option value="p95">Top 95th Percentile</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="startTime">Start Time (HH:MM:SS):</label>
-                <input type="text" id="startTime" placeholder="00:00:00" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
-            </div>
-            <div class="control-group">
-                <label for="endTime">End Time (HH:MM:SS):</label>
-                <input type="text" id="endTime" placeholder="23:59:59" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
-            </div>
-            <div class="control-group">
-                <button id="applyTimeRange" style="padding: 8px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; margin-top: 20px; transition: background 0.2s;">Apply Time Range</button>
-            </div>
-        </div>
+
         
         <div class="stats hidden" id="thresholdStats">
             <div class="stat-card" style="grid-column: 1 / -1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
@@ -468,11 +424,58 @@
                 <strong>💡 Tip:</strong> Drag across any of the three metric charts to select a time range. The statistics will update to show averages for your selection.
                 <button class="reset-zoom-btn" onclick="resetZoom()">Reset Zoom</button>
             </div>
+            <div class="controls" id="timeControls" style="padding: 20px 40px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                <div class="control-group">
+                    <label for="startTime">Start Time (HH:MM:SS):</label>
+                    <input type="text" id="startTime" placeholder="00:00:00" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
+                </div>
+                <div class="control-group">
+                    <label for="endTime">End Time (HH:MM:SS):</label>
+                    <input type="text" id="endTime" placeholder="23:59:59" style="padding: 8px 15px; border: 2px solid #e9ecef; border-radius: 8px; font-size: 1em;">
+                </div>
+                <div class="control-group">
+                    <button id="applyTimeRange" style="padding: 8px 20px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1em; margin-top: 20px; transition: background 0.2s;">Apply Time Range</button>
+                </div>
+            </div>
             <div class="metric-charts">
                 <div class="chart-container" style="border: 3px solid #667eea;">
                     <h2>🎯 Overall LinuxONE CPU % Over Time</h2>
                     <div class="chart-wrapper">
                         <canvas id="overallCpuChart"></canvas>
+                    </div>
+                </div>
+                <div class="controls" style="padding: 20px 40px; background: #f8f9fa; border-bottom: 1px solid #e9ecef; display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                    <div class="control-group">
+                        <label for="viewModeSelect">View Mode:</label>
+                        <select id="viewModeSelect">
+                            <option value="line">Line Chart</option>
+                            <option value="stacked">Stacked Area</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="systemSelect">Partition:</label>
+                        <select id="systemSelect">
+                            <option value="">All Partitions</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="topNSelect">Top N LPARs (Line View):</label>
+                        <select id="topNSelect">
+                            <option value="5">Top 5</option>
+                            <option value="10">Top 10</option>
+                            <option value="15">Top 15</option>
+                            <option value="20">Top 20</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label for="sortMethodSelect">Core% Sort By:</label>
+                        <select id="sortMethodSelect">
+                            <option value="avg">Top Avg%</option>
+                            <option value="max">Top Core%</option>
+                            <option value="p99">Top 99th Percentile</option>
+                            <option value="p95">Top 95th Percentile</option>
+                        </select>
                     </div>
                 </div>
                 <div class="stats" id="stats" style="margin-bottom: 30px;"></div>
@@ -615,7 +618,6 @@
                 parsedData = null;
                 updateFileList();
                 document.getElementById('systemInfo').classList.add('hidden');
-                document.getElementById('controls').classList.add('hidden');
                 document.getElementById('charts').classList.add('hidden');
                 document.getElementById('stats').classList.add('hidden');
                 document.getElementById('thresholdStats').classList.add('hidden');
@@ -632,7 +634,6 @@
             parsedData = null;
             updateFileList();
             document.getElementById('systemInfo').classList.add('hidden');
-            document.getElementById('controls').classList.add('hidden');
             document.getElementById('charts').classList.add('hidden');
             document.getElementById('stats').classList.add('hidden');
             document.getElementById('thresholdStats').classList.add('hidden');
@@ -827,7 +828,6 @@
             
             // Show controls and charts
             document.getElementById('systemInfo').classList.remove('hidden');
-            document.getElementById('controls').classList.remove('hidden');
             document.getElementById('charts').classList.remove('hidden');
             document.getElementById('stats').classList.remove('hidden');
             document.getElementById('thresholdStats').classList.remove('hidden');
